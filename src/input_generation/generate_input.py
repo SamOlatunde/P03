@@ -25,6 +25,28 @@ config = {
 
 def biased_randint(low, high, biased_range, mid_range=None , m_weight=2, b_weight=5):
     if (mid_range):
+        """
+    Generate a random integer between `low` and `high` (inclusive) with customizable bias.
+
+    The function increases the likelihood of selecting integers from specified ranges 
+    (`biased_range` and optionally `mid_range`) by assigning higher weights to them.
+
+    Parameters:
+        low (int): The lower bound of the range (inclusive).
+        high (int): The upper bound of the range (inclusive).
+        biased_range (iterable): A range of numbers to assign a higher selection weight (`b_weight`).
+        mid_range (iterable, optional): An additional range of numbers to assign a moderate selection weight (`m_weight`).
+                                         Defaults to None, meaning no mid-range weighting is applied.
+        m_weight (int, optional): The weight assigned to numbers in the `mid_range`. Defaults to 2.
+        b_weight (int, optional): The weight assigned to numbers in the `biased_range`. Defaults to 5.
+
+    Returns:
+        int: A randomly selected integer between `low` and `high`, with bias applied based on the weights.
+
+    Example:
+        >>> biased_randint(1, 10, biased_range=[3, 4, 5], mid_range=[7, 8], m_weight=3, b_weight=6)
+        5  # More likely but not guaranteed to be in the biased_range or mid_range
+    """
         # generate full list 
         numbers = range(low,high+1)
         
@@ -51,6 +73,44 @@ def biased_randint(low, high, biased_range, mid_range=None , m_weight=2, b_weigh
 
 # if no_burst is not passed, we set it to the min number of bursts 
 def burst_generator(process_type, no_bursts=config["min_bursts"]): 
+    """
+    Generates a sequence of CPU and I/O bursts for a process based on its type.
+
+    This function creates a list of bursts, alternating between CPU and I/O operations. 
+    The number of bursts is validated and adjusted to ensure an even count, so the sequence 
+    always ends with a CPU burst. The burst values are generated either randomly or with 
+    specific biases depending on the `process_type`.
+
+    Parameters:
+        process_type (str): 
+            The type of process. Can be one of:
+                - 'P': Priority-based. Bursts are generated with no bias.
+                - 'C': CPU-intensive. CPU bursts are biased towards higher values, and 
+                       I/O bursts are biased towards lower values.
+                - 'I': I/O-intensive. CPU bursts are biased towards lower values, and 
+                       I/O bursts are biased towards higher values.
+        no_bursts (int, optional): 
+            The number of bursts to generate. Defaults to `config["min_bursts"]`. 
+            If not within the range [`config["min_bursts"]`, `config["max_bursts"]`], 
+            it is set to `config["max_bursts"]`.
+
+    Returns:
+        list: A list of burst values, alternating between CPU and I/O bursts.
+
+    Notes:
+        - The `biased_randint` function is used to introduce biases in burst generation 
+          for CPU- and I/O-intensive processes.
+
+    Example:
+        >>> burst_generator('P', 5)
+        [20, 15, 30, 12, 25]  # Alternates CPU and I/O bursts with no bias.
+
+        >>> burst_generator('C', 6)
+        [90, 5, 85, 7, 92, 6]  # CPU bursts are higher; I/O bursts are lower.
+
+        >>> burst_generator('I', 4)
+        [3, 95, 2, 90]  # CPU bursts are lower; I/O bursts are higher.
+    """
     bursts = []
 
     # validate the no_bursts variable
@@ -129,10 +189,42 @@ def burst_generator(process_type, no_bursts=config["min_bursts"]):
 
 
 
-     
-
 def generate_file(filename, num_processes, process_type):
+    """
+    Generate a file containing simulated process data, sorted by arrival time.
 
+    This function creates a specified number of processes with arrival times, process IDs, 
+    priorities, and CPU/I/O bursts. The generated processes are written to a file in a format 
+    where each line represents one process. Processes are sorted by their arrival time.
+
+    Parameters:
+        filename (str): 
+            The name of the file to write the process data to.
+        num_processes (int): 
+            The number of processes to generate.
+        process_type (str): 
+            The type of process. Can be one of:
+                - 'P': Priority-based. Assigns higher weights to high-priority values 
+                       when generating priorities.
+                - 'C' or 'I': CPU- or I/O-intensive. Generates priorities randomly 
+                              without bias.
+
+    Notes:
+        - Each process is represented as a list: [arrival_time, pid, priority, bursts...].
+        - `config` is assumed to be a global dictionary containing:
+            - "prioritys": A list defining the range of priority values.
+            - "min_bursts" and "max_bursts": The minimum and maximum number of bursts per process.
+        - The `biased_randint` function is used for biased random priority generation.
+        - The `burst_generator` function is used to create the CPU and I/O burst sequences.
+
+    Output:
+        - The file contains one line per process, with space-separated values:
+          <arrival_time> <pid> <priority> <burst_1> <burst_2> ...
+
+    Example:
+        >>> generate_file("processes.txt", 5, 'P')
+        # The file "processes.txt" is created with 5 priority-based processes.
+    """
     #open file 
     with open(filename, 'w') as file:
         processes = [] # holds all proceses generated 
