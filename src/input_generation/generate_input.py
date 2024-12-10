@@ -1,6 +1,7 @@
 from pathlib import Path
 import random 
 
+
 #configuration data 
 config = {
         "min_jobs": 5,
@@ -281,7 +282,7 @@ def generate_file(filename, num_processes, process_type):
             file.write(' '.join(map(str,process ))+ '\n')
          
 
-def get_run_count(file_name="run_count.txt"):
+def get_run_count(file_name=Path(__file__).resolve().parent / "run_count.txt"):
     """
     Retrieves the program's run count from a file. Returns 0 if the file doesn't exist.
     
@@ -299,7 +300,7 @@ def get_run_count(file_name="run_count.txt"):
     return count
 
 
-def update_run_count(file_name="run_count.txt", count=None):
+def update_run_count(file_name=Path(__file__).resolve().parent / "run_count.txt", count=None):
     """
     Updates the run count in a file. If no count is provided, increments the current count.
     
