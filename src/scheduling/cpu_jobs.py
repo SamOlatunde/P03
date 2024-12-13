@@ -61,7 +61,7 @@ def getConfig (scenario:int, client_id = "BigSam"):
         "priority_heavy" 
         ]
     
-    route = f"http://profgriffin.com:8000/scenario?scenario={Scenarios[scenario]}"
+    route = f"http://profgriffin.com:8000/scenario?scenario={Scenarios[scenario]}&client_id={client_id}"
 
     r = requests.get(route)
 

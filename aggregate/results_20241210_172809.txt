@@ -1,0 +1,15 @@
+Scheduling Algorithm: Round Robin
+Number of CPUs: 4
+Total Simulation Time: 98
+Throughput: 0.05 jobs/unit time
+CPU Utilization: 0.00%
+Fairness (Turnaround Time Std Dev): 3.49
+
+Terminated Jobs:
+PID       Arrival   Priority  Turnaround Time     
+==================================================
+1         3260      1         23                  
+2         3280      1         29                  
+3         3293      1         29                  
+4         3313      2         25                  
+5         3323      1         20                  

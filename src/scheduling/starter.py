@@ -386,10 +386,11 @@ if __name__== '__main__':
 
         #print(type(jobs_left))
         
-        if  jobs_left == 0:
+        if  not jobs_left:
             # Generate a unique filename using a timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = ag_path / f"results_{timestamp}.txt"
+            printAg(filename,algorithm_type,num_cpus,terminatedQ,running_queue,start_clock,clock)
             break
 
         
