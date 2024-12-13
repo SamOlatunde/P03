@@ -1,0 +1,16 @@
+Scheduling Algorithm: P
+Number of CPUs: 4
+Total Simulation Time: 98
+Throughput: 0.06 jobs/unit time
+CPU Utilization: 24.74%
+Fairness (Turnaround Time Std Dev): 11.11
+
+Terminated Jobs:
+PID       Arrival   Priority  Turnaround Time     
+==================================================
+2         1722      2         8                   
+3         1732      1         7                   
+1         1710      1         32                  
+5         1757      1         6                   
+4         1743      1         30                  
+6         1767      2         24                  

@@ -30,8 +30,10 @@ class Process:
         self.current_burst= {}  # Tracks current burst being executed includes, id, type and duration 
         self.state = "NEW"  # States: NEW, READY, RUNNING, WAITING, TERMINATED
         self.completed = False  # True if all bursts are complete
-        self.wait_time = 0
-        self.turnaround_time = 0 # 
+        self.wait_time = 0 # track wait time 
+        self.turnaround_time = 0 # total time, process spends in system 
+        self.remaining_time = 0 # used in round robin  for premeption
+        self.cpu_burst_accumulator = 0 # sums up all cpu bursts 
 
 
     def is_cpu_burst(self):
@@ -57,11 +59,20 @@ class Process:
         # set the current burst of the process 
         self.current_burst = response["data"] 
         
+        # update the burst accumulator if its a cpu burst 
+        if self.is_cpu_burst():
+            self.cpu_burst_accumulator += 1
+            
         # set completed to true if its the last burst, no duration involed   
         if response["data"]["burst_type"] == "EXIT":
             self.completed = True
+
             # compute time spent in the system 
             self.turnaround_time = clock - self.arrival_time
+
+            # compute wait_time  = turnaround_time - burst_time
+            self.wait_time = self.turnaround_time - self.cpu_burst_accumulator
+
 
         # Decrement the number of bursts remaining, ensuring it doesn't go negative
         self.num_bursts = max(0, self.num_bursts - 1)
@@ -141,6 +152,7 @@ class CPU:
         self.active_time = 0     # Total time CPU has been active
         self.idle_time = 0       # Total time CPU has been idle
         self.completed_jobs = 0  # Count of jobs completed by this CPU
+        
 
     def assign_job(self, job):
         self.current_job = job
