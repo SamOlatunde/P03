@@ -1,13 +1,8 @@
-Here is the README content entirely in Markdown:
-
-```markdown
 # CPU Scheduling Simulator
 
 ## Overview
 
 This project simulates various CPU scheduling algorithms to manage and execute processes efficiently. It models how processes transition between different states (e.g., ready, running, waiting) and tracks key metrics like CPU utilization, throughput, and fairness. The project supports multiple scheduling algorithms, including **First-Come, First-Served (FCFS)**, **Round Robin (RR)**, **Priority Scheduling**, and **Multi-Level Feedback Queue (MLFQ)**.
-
----
 
 ## Features
 
