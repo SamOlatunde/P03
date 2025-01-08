@@ -162,29 +162,11 @@ PID       Arrival    Priority   Turnaround Time
 
 ---
 
-## Contributing
 
-Contributions are welcome! To contribute:
-1. Fork the repository.
-2. Create a feature branch:
-   ```bash
-   git checkout -b feature-name
-   ```
-3. Commit your changes and push to your fork.
-4. Open a pull request.
-
----
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
 
 ## Contact
 
 For questions or feedback, feel free to reach out:
-- **Email**: yourname@example.com
-- **GitHub**: [yourusername](https://github.com/yourusername)
+- **Email**: psalmyz735@gmail.com
 ```
 
