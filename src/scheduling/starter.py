@@ -2,6 +2,9 @@ from collections import deque
 from pathlib import Path 
 import cpu_jobs as c
 from datetime import datetime
+from rich.console import Console
+from rich.table import Table
+import time
 
 class Process:
     """
@@ -21,6 +24,8 @@ class Process:
         completed (bool): Indicates whether all bursts have been executed.
         wait_time (int): The total time the process has spent waiting in the ready queue.
         turnaround_time (int): The total time the process spends in the system from arrival to termination.
+        self.remaining_time (int) : used in preemptive scheduling
+        self.cpu_burst_accumulator (int) : keeps track of number of cpu bursts 
     """
     def __init__(self, arrival_time, pid, priority, num_bursts):
         self.arrival_time = arrival_time  # When process arrives in the system
@@ -61,7 +66,7 @@ class Process:
         
         # update the burst accumulator if its a cpu burst 
         if self.is_cpu_burst():
-            self.cpu_burst_accumulator += 1
+            self.cpu_burst_accumulator += self.current_burst["duration"]
             
         # set completed to true if its the last burst, no duration involed   
         if response["data"]["burst_type"] == "EXIT":
@@ -122,6 +127,8 @@ class Process:
                 f"PID: {self.pid}, State: {self.state}, "
                 f"Priority: {self.priority}, "
                 f"Completed: {self.completed}")
+    
+
 
 
 class CPU:
@@ -166,7 +173,45 @@ class CPU:
         else:
             self.idle_time += 1"""
 
+class IO:
+    """
+    Represents an I/O device in a scheduling simulation. Each I/O device can handle one job at a time,
+    track its active and idle times, and maintain a count of completed I/O operations.
 
+    Attributes:
+        id (int): Unique identifier for the I/O device.
+        current_job (Process or None): The process currently assigned to the I/O device.
+                                       None if the device is idle.
+        active_time (int): Total time the I/O device has spent processing jobs.
+        idle_time (int): Total time the I/O device has been idle (not processing any jobs).
+        completed_io_operations (int): The total number of I/O operations the device has completed.
+
+    Methods:
+        assign_job(job):
+            Assigns a job (process) to the I/O device.
+        
+        process_io(clock):
+            Processes the current job if one is assigned. Updates active or idle
+            time and increments the count of completed I/O operations if the current job
+            finishes its I/O burst.
+    """
+    def __init__(self, id):
+        self.id = id
+        self.current_job = None  # The process/job assigned to this I/O device
+        self.active_time = 0     # Total time the I/O device has been active
+        self.idle_time = 0       # Total time the I/O device has been idle
+        self.completed_io_operations = 0  # Count of completed I/O operations
+
+    def assign_job(self, job):
+        """
+        Assigns a job (process) to the I/O device.
+
+        Args:
+            job (Process): The job to assign to the I/O device.
+        """
+        self.current_job = job
+
+    
 
 def parse_input_file(file_path):
     """
@@ -229,17 +274,17 @@ def fcfs(running_queue, readyQ):
     for cpu in running_queue:
         # If the CPU is idle (current_job is None)
         if not cpu.current_job:
-            print(f"CPU {cpu.id} is idle. Checking ready queue...")
+            #print(f"CPU {cpu.id} is idle. Checking ready queue...")
             if readyQ:
                 # Assign the job at the front of the ready queue to the CPU
                 job = readyQ.popleft()
-                print(f"Assigning Job {job.pid} (Priority: {job.priority}) to CPU {cpu.id}.")
+               # print(f"Assigning Job {job.pid} (Priority: {job.priority}) to CPU {cpu.id}.")
                 cpu.assign_job(job)
                 cpu.current_job.update_state("RUNNING")
-            else:
-                print(f"No jobs in the ready queue to assign to CPU {cpu.id}.")
-        else:
-            print(f"CPU {cpu.id} is busy with Job {cpu.current_job.pid}.") # Update state for the assigned job
+            #else:
+               # print(f"No jobs in the ready queue to assign to CPU {cpu.id}.")
+       # else:
+            #print(f"CPU {cpu.id} is busy with Job {cpu.current_job.pid}.") # Update state for the assigned job
 
 def sjf(running_queue, readyQ):
     """
@@ -254,20 +299,20 @@ def sjf(running_queue, readyQ):
     for cpu in running_queue:
         # If the CPU is idle (current_job is None)
         if not cpu.current_job:
-            print(f"CPU {cpu.id} is idle. Checking ready queue for the shortest job...")
+            #print(f"CPU {cpu.id} is idle. Checking ready queue for the shortest job...")
             if readyQ:
                 # Find the job with the shortest CPU burst duration
                 shortest_job = min(readyQ, key=lambda job: job.current_burst["duration"])
-                print(f"Selected Job {shortest_job.pid} with burst duration {shortest_job.current_burst['duration']} as the shortest job.")
+                #print(f"Selected Job {shortest_job.pid} with burst duration {shortest_job.current_burst['duration']} as the shortest job.")
                 
                 readyQ.remove(shortest_job)  # Remove the selected job from the ready queue
                 cpu.assign_job(shortest_job)
                 cpu.current_job.update_state("RUNNING")
-                print(f"Assigned Job {shortest_job.pid} to CPU {cpu.id}.")
-            else:
-                print(f"No jobs in the ready queue to assign to CPU {cpu.id}.")
-        else:
-            print(f"CPU {cpu.id} is busy with Job {cpu.current_job.pid}.")
+               # print(f"Assigned Job {shortest_job.pid} to CPU {cpu.id}.")
+            #else:
+             #   print(f"No jobs in the ready queue to assign to CPU {cpu.id}.")
+        #else:
+         #   print(f"CPU {cpu.id} is busy with Job {cpu.current_job.pid}.")
 
 
 def priority_scheduling(running_queue, readyQ):
@@ -280,34 +325,121 @@ def priority_scheduling(running_queue, readyQ):
         running_queue (list): A list of CPU objects representing the running CPUs.
         readyQ (deque): A deque containing the processes ready for execution (CPU bursts only).
     """
-    print("Running Priority Scheduling!!!")
+    #print("Running Priority Scheduling!!!")
     
     for cpu in running_queue: 
         # If the CPU is idle (current_job is None)
         if not cpu.current_job:
-            print(f"CPU {cpu.id} is idle. Checking ready queue for the highest priority job...")
+           # print(f"CPU {cpu.id} is idle. Checking ready queue for the highest priority job...")
             if readyQ:
                 # Find the job with the highest priority (lowest priority number)
                 highest_priority_job = min(readyQ, key=lambda process: process.priority)
-                print(f"Selected Job {highest_priority_job.pid} with priority {highest_priority_job.priority} as the highest priority job.")
+              #  print(f"Selected Job {highest_priority_job.pid} with priority {highest_priority_job.priority} as the highest priority job.")
 
                 # Remove the highest-priority job from the ready queue
                 readyQ.remove(highest_priority_job)
-                print(f"Removed Job {highest_priority_job.pid} from the ready queue.")
+                #print(f"Removed Job {highest_priority_job.pid} from the ready queue.")
 
                 # Update the state of the job to "RUNNING"
                 highest_priority_job.update_state("RUNNING")
-                print(f"Updated Job {highest_priority_job.pid} state to RUNNING.")
+                #print(f"Updated Job {highest_priority_job.pid} state to RUNNING.")
 
                 # Assign the job to the idle CPU
                 cpu.assign_job(highest_priority_job)
-                print(f"Assigned Job {highest_priority_job.pid} to CPU {cpu.id}.")
-            else:
-                print(f"No jobs in the ready queue to assign to CPU {cpu.id}.")
-        else:
-            print(f"CPU {cpu.id} is busy with Job {cpu.current_job.pid}.")
+               # print(f"Assigned Job {highest_priority_job.pid} to CPU {cpu.id}.")
+           # else:
+               # print(f"No jobs in the ready queue to assign to CPU {cpu.id}.")
+       # else:
+          #  print(f"CPU {cpu.id} is busy with Job {cpu.current_job.pid}.")
 
-def printAg(filename, algorithm_type, num_cpus, terminatedQ, running_queue, start_clock, end_time):
+
+
+def print_queues(clock_tick, readyQ, running_queue, waitingQ, io_queue, terminatedQ, algorithm_type):
+    """
+    Prints a table of processes in each queue at the current clock tick.
+
+    Args:
+        clock_tick (int): The current simulation clock tick.
+        ready_queue (list): The list of processes in the READY queue.
+        running_queue (list): The list of processes currently RUNNING.
+        io_queue (list): The list of processes in the IO queue.
+        terminated_queue (list): The list of terminated processes.
+    """
+    console = Console()
+
+    console.clear()
+
+    table = Table(title=f"{algorithm_type}: Process Queues at Clock Tick {clock_tick}")
+    
+    table.add_column("Queues", style="cyan", no_wrap=True)
+    table.add_column("Processes", style="cyan")
+    
+   
+
+    # Convert the running queue (list of CPU objects) to a string or "Empty" if no jobs
+    if running_queue:
+        running_ids_list = []
+        for cpu in running_queue:
+            if cpu.current_job:
+                running_ids_list.append(f"CPU{cpu.id}:{cpu.current_job.pid}")
+            else:
+                running_ids_list.append(f"CPU{cpu.id}:Idle")
+        running_ids = ", ".join(running_ids_list)
+    else:
+        running_ids = "Empty"
+
+    # Convert the I/O queue (list of IO objects) to a string or "Empty" if no jobs
+    if io_queue:
+        io_ids_list = []
+        for io_device in io_queue:
+            if io_device.current_job:
+                io_ids_list.append(f"IO{io_device.id}:{io_device.current_job.pid}")
+            else:
+                io_ids_list.append(f"IO{io_device.id}:Idle")
+        io_ids = ", ".join(io_ids_list)
+    else:
+        io_ids = "Empty"
+
+    # Convert other queues (readyQ, waitingQ, terminatedQ) to strings or "Empty" if no jobs
+    if readyQ:
+        ready_ids_list = []
+        for proc in readyQ:
+            ready_ids_list.append(str(proc.pid))
+        ready_ids = ", ".join(ready_ids_list)
+    else:
+        ready_ids = "Empty"
+
+    if waitingQ:
+        waiting_ids_list = []
+        for proc in waitingQ:
+            waiting_ids_list.append(str(proc.pid))
+        waiting_ids = ", ".join(waiting_ids_list)
+    else:
+        waiting_ids = "Empty"
+
+    if terminatedQ:
+        terminated_ids_list = []
+        for proc in terminatedQ:
+            terminated_ids_list.append(str(proc.pid))
+        terminated_ids = ", ".join(terminated_ids_list)
+    else:
+        terminated_ids = "Empty"
+
+    # Add rows to the table
+    table.add_row("READY", ready_ids, style="magenta")
+    table.add_row("RUNNING", running_ids, style = "green")
+    table.add_row("WAITING", waiting_ids, style = "yellow")
+    table.add_row("IO", io_ids, style = "red3")
+    table.add_row("TERMINATED", terminated_ids, style = "orange4")
+
+
+    
+    # Print the table
+    console.print(table, justify="center")
+
+    time.sleep(0.4)
+
+def printAg(filename, algorithm_type, num_cpus,num_io, terminatedQ, running_queue, start_clock, end_time):
     """
     Prints the results of the scheduling algorithm execution to a file.
 
@@ -315,6 +447,7 @@ def printAg(filename, algorithm_type, num_cpus, terminatedQ, running_queue, star
         filename (str): The name of the output file.
         algorithm_type (str): The type of scheduling algorithm used.
         num_cpus (int): The number of CPUs in the system.
+        num_io (int): the number of IO devices in the system 
         terminatedQ (deque): A deque containing the processes that have completed execution.
         start_clock (int): The simulation's start time.
         end_time (int): The simulation's end time.
@@ -332,13 +465,18 @@ def printAg(filename, algorithm_type, num_cpus, terminatedQ, running_queue, star
     total_cpu_time = total_time * num_cpus
     active_time = sum(cpu.active_time for cpu in running_queue)  
     cpu_utilization = (active_time / total_cpu_time) * 100 if total_cpu_time > 0 else 0
-
+    
+    #wait comp
+    wait_times = [job.wait_time for job in terminatedQ]
     # Fairness: Standard deviation of CPU times for all jobs
     job_times = [job.turnaround_time for job in terminatedQ]
     if len(job_times) > 1:
+        mean_wait = sum(wait_times) / len(wait_times)
         mean_turnaround = sum(job_times) / len(job_times)
         fairness = (sum((x - mean_turnaround) ** 2 for x in job_times) / len(job_times)) ** 0.5
     else:
+        mean_turnaround = 0
+        mean_wait = 0
         fairness = 0  # Fairness not applicable with one or no jobs
 
     # Write results to file
@@ -346,18 +484,19 @@ def printAg(filename, algorithm_type, num_cpus, terminatedQ, running_queue, star
         with open(filename, "w") as file:
             file.write(f"Scheduling Algorithm: {algorithm_type}\n")
             file.write(f"Number of CPUs: {num_cpus}\n")
+            file.write(f"Number of IODs: {num_io}\n")
             file.write(f"Total Simulation Time: {total_time}\n")
             file.write(f"Throughput: {throughput:.2f} jobs/unit time\n")
             file.write(f"CPU Utilization: {cpu_utilization:.2f}%\n")
-            file.write(f"Fairness (Turnaround Time Std Dev): {fairness:.2f}\n")
-            file.write(f"Fairness (Turnaround Time Std Dev): {fairness:.2f}\n\n")
+            file.write(f"Mean Wait Time: {mean_wait:.2f}\n")
+            file.write(f"Mean Turnaround Time: {mean_turnaround:.2f}\n")
             file.write(f"Fairness (Turnaround Time Std Dev): {fairness:.2f}\n\n")
             file.write("Terminated Jobs:\n")
-            file.write(f"{'PID':<10}{'Arrival':<10}{'Priority':<10}{'Turnaround Time':<20}\n")
-            file.write("=" * 50 + "\n")
+            file.write(f"{'PID':<10}{'Arrival':<10}{'Priority':<10}{'Wait Time':<10}{'Burst Time':<15}{'Turnaround Time':<20}\n")
+            file.write("=" * 80 + "\n")
             for job in terminatedQ:
                 file.write(
-                    f"{job.pid:<10}{job.arrival_time:<10}{job.priority:<10}{job.turnaround_time:<20}\n"
+                    f"{job.pid:<10}{job.arrival_time:<10}{job.priority:<10}{job.wait_time:<10}{job.cpu_burst_accumulator:<15}{job.turnaround_time:<20}\n"
                 )
         print(f"Results successfully written to {filename}.")
     except Exception as e:
@@ -372,12 +511,16 @@ if __name__== '__main__':
     num_cpus = 4
     running_queue = [CPU(id=i) for i in range(num_cpus)]
 
+    #initialize io devices 
+    num_io = 4
+    io_queue = [IO(id = i) for i in range(num_io)]
+
     readyQ = deque()
     waitingQ = deque()
     terminatedQ = deque()
 
     # type of scheduling algorithm to run 
-    algorithm_type = 'P'
+    algorithm_type = 'FCFS'
     #make sure to remove the temporary one if you are chaninge back to this 
     # client_id = "BigSam"
 
@@ -403,7 +546,7 @@ if __name__== '__main__':
             # Generate a unique filename using a timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = ag_path / f"results_{timestamp}.txt"
-            printAg(filename,algorithm_type,num_cpus,terminatedQ,running_queue,start_clock,clock)
+            printAg(filename,algorithm_type,num_cpus,num_io, terminatedQ,running_queue,start_clock,clock)
             break
 
         
@@ -427,15 +570,18 @@ if __name__== '__main__':
                     if process.is_cpu_burst():
                         # Set state of process to READY
                         process.state = "READY"
-
+                       
                         # Add process to ready queue
                         readyQ.append(process)
+                        print_queues(clock, readyQ,running_queue,waitingQ,io_queue,terminatedQ,algorithm_type)
                     else:
                         # Handle I/O burst processes
                         process.state = "WAITING"
                         
                         # Add process to waiting queue
                         waitingQ.append(process)
+
+                        print_queues(clock, readyQ,running_queue,waitingQ,io_queue,terminatedQ,algorithm_type)
 
         
         # choose which algorithm to run 
@@ -465,7 +611,7 @@ if __name__== '__main__':
                         cpu.current_job.state = "TERMINATED"
                         # Move the job to the terminated queue
                         terminatedQ.append(cpu.current_job)
-                        print(f"Job {cpu.current_job.pid} has completed and is moved to the terminated queue.")
+                        #print(f"Job {cpu.current_job.pid} has completed and is moved to the terminated queue.")
 
                         # Increment completed jobs counter
                         cpu.completed_jobs += 1
@@ -481,42 +627,49 @@ if __name__== '__main__':
                         if not cpu.current_job.is_cpu_burst():
                             cpu.current_job.state = "WAITING"
                             waitingQ.append(cpu.current_job)
-                            print(f"Job {cpu.current_job.pid} moved to the waiting queue for an I/O burst.")
+                            #print(f"Job {cpu.current_job.pid} moved to the waiting queue for an I/O burst.")
 
                             # Free up the CPU
                             cpu.current_job = None
             else:
                 # If the CPU is idle, increment idle time
                 cpu.idle_time += 1
-                print(f"CPU {cpu.id} is currently idle.")
+                #print(f"CPU {cpu.id} is currently idle.")
            
-        # Process the waiting queue
-        for process in list(waitingQ):  # Use list to avoid modifying the deque while iterating
-            # Decrement the I/O burst duration
-            io_burst_complete = process.proceed_burst(client_id, session_id, clock)
+        # Process the I/O queue for each I/O device
+        for io_device in io_queue:
+            if not io_device.current_job:  # Check if the I/O device is idle
+                if waitingQ:  # Assign a process from the waiting queue to the idle I/O device
+                    process = waitingQ.popleft()  # Dequeue a process from the waiting queue
+                    io_device.assign_job(process)
+                    #print(f"Job {process.pid} is assigned to I/O device {io_device.id}.")
 
-            # If the I/O burst is completed
-            if io_burst_complete:
-                waitingQ.remove(process)  # Remove from the waiting queue
+            # Process the current job on the I/O device
+            if io_device.current_job:
+                process = io_device.current_job
+                io_burst_complete = process.proceed_burst(client_id, session_id, clock)
 
-                """next burst already gotten from call to proceed_burst"""
-
-                if process.completed:
-                    process.state = "TERMINATED"
-
-                    terminatedQ.append(process)
-                    print(f"Job {process.pid} has completed and is moved to the terminated queue.")
-                else:
-                    # If the next burst is a CPU burst, move the process to the ready queue
-                    if process.is_cpu_burst():
-                        process.state = "READY"
-                        readyQ.append(process)
-                        print(f"Job {process.pid} has completed I/O and is moved to ready queue.")
+                # If the I/O burst is completed
+                if io_burst_complete:
+                    # Determine the next state for the process
+                    if process.completed:
+                        process.state = "TERMINATED"
+                        terminatedQ.append(process)
+                        #print(f"Job {process.pid} has completed and is moved to the terminated queue.")
                     else:
-                        # If the next burst is another I/O burst, re-add to the waiting queue
-                        process.state = "WAITING"
-                        waitingQ.append(process)
-                        print(f"Job {process.pid} continues with another I/O burst.")
+                        # Check if the next burst is a CPU burst or another I/O burst
+                        if process.is_cpu_burst():
+                            process.state = "READY"
+                            readyQ.append(process)
+                            #print(f"Job {process.pid} has completed I/O and is moved to the ready queue.")
+                        else:
+                            process.state = "WAITING"
+                            waitingQ.append(process)
+                            #print(f"Job {process.pid} continues with another I/O burst.")
+
+                    io_device.current_job = None
+
+        print_queues(clock, readyQ,running_queue,waitingQ,io_queue,terminatedQ,algorithm_type)
         
         # Advance the clock
         clock += 1

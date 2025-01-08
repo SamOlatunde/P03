@@ -1,0 +1,23 @@
+Scheduling Algorithm: Round Robin
+Number of CPUs: 4
+Number of IODs: 4
+Total Simulation Time: 174
+Throughput: 0.06 jobs/unit time
+CPU Utilization: 0.00%
+Mean Wait Time: 1.80
+Mean Turnaround Time: 17.80
+Fairness (Turnaround Time Std Dev): 8.93
+
+Terminated Jobs:
+PID       Arrival   Priority  Wait Time Burst Time     Turnaround Time     
+================================================================================
+1         1973      3         0         5              5                   
+2         1988      2         0         6              6                   
+3         1998      1         0         18             18                  
+5         2025      1         0         15             15                  
+4         2013      2         0         27             27                  
+6         2042      2         0         12             12                  
+7         2061      2         0         13             13                  
+8         2072      2         0         28             28                  
+9         2084      3         0         21             21                  
+10        2103      2         18        15             33                  

@@ -1,10 +1,13 @@
 from collections import deque
+import cpu_jobs
+from collections import deque
 from pathlib import Path 
 import cpu_jobs as c
-import time
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
+import time
+
 
 class Process:
     """
@@ -211,109 +214,74 @@ class IO:
         """
         self.current_job = job
 
-
-
-
-def parse_input_file(file_path):
-    """
-    Parses an input file and loads the processes into a queue.
-
-    Args:
-        file_path (str or Path): Path to the input file.
-
-    Returns:
-        deque: A queue containing Process objects.
-    """
-    process_queue = deque()
     
-    file_path = Path(file_path)  # Ensure file_path is a Path object
-
-    try:
-        with open(file_path, 'r') as file:
-            for line in file:
-                line = line.strip()
-                if not line:
-                    continue  # Skip empty lines
-
-                parts = line.split(' ')
-                
-                # Parse process attributes
-                arrival_time = int(parts[0].strip())
-                pid = int(parts[1].strip())
-                priority = int(parts[2].strip())
-                
-                bursts = []
-                #load the rest of  lists into burst 
-                for p in parts[3:]:
-                    stripped_p = p.strip()
-                    bursts.append(int(stripped_p))
-              
-
-                # Create a Process instance and add it to the queue
-                process = Process(arrival_time, pid, priority, bursts)
-                process_queue.append(process)
-
-    except FileNotFoundError:
-        print(f"Error: File not found at {file_path}")
-    except Exception as e:
-        print(f"Error parsing file {file_path}: {e}")
-
-    return process_queue
-
-def round_robin(running_queue, readyQ, time_quantum):
+ 
+def print_queues(clock_tick, ready_queues, running_queue, waitingQ, io_devices, terminatedQ, algorithm_type):
     """
-    Implements the Round Robin (RR) scheduling algorithm.
+    Prints a table of processes in each queue at the current clock tick.
 
     Args:
-        running_queue (list): A list of CPU objects representing the running CPUs.
-        readyQ (deque): A deque containing the processes ready for execution.
-        time_quantum (int): The fixed time quantum for each process.
-
-    Returns:
-        None
+        clock_tick (int): The current simulation clock tick.
+        ready_queues (list of deque): List of ready queues for different priority levels.
+        running_queue (list): The list of CPU objects representing the running queue.
+        waitingQ (deque): The queue of processes waiting for I/O devices.
+        io_devices (list): The list of IO devices and their current jobs.
+        terminatedQ (deque): The queue of terminated processes.
+        algorithm_type (str): The name of the scheduling algorithm being used.
     """
-    #print("Running Round Robin Scheduling!!!")
+    console = Console()
+    console.clear()
 
-    for cpu in running_queue:
-        # If the CPU is idle (current_job is None)
-        if not cpu.current_job:
-            if readyQ:
-                # Assign the next job from the ready queue to the CPU
-                job = readyQ.popleft()
-                cpu.assign_job(job)
-                cpu.current_job.remaining_time = min(time_quantum, job.current_burst["duration"])
-                cpu.current_job.update_state("RUNNING")
-               # print(f"Assigned Job {job.pid} to CPU {cpu.id} with time quantum {time_quantum}.")
+    # Create the main table
+    table = Table(title=f"{algorithm_type}: Process Queues at Clock Tick {clock_tick}")
+    table.add_column("Queues", style="cyan", no_wrap=True)
+    table.add_column("Processes", style="cyan")
+
+    # Process ready queues for MLFQ
+    ready_queues_display = []
+    for priority, queue in enumerate(ready_queues):
+        if queue:
+            queue_ids = [str(proc.pid) for proc in queue]
+            ready_queues_display.append(f"Priority {priority}: {', '.join(queue_ids)}")
         else:
-            # Decrement the remaining time for the job on this CPU
-            cpu.current_job.remaining_time -= 1
-            cpu.current_job.current_burst["duration"] -= 1
+            ready_queues_display.append(f"Priority {priority}: Empty")
+    ready_ids = "\n".join(ready_queues_display) if ready_queues_display else "Empty"
 
-            # Check if the job's current burst is complete
-            if cpu.current_job.current_burst["duration"] == 0:
-                #print(f"Job {cpu.current_job.pid} completed its burst on CPU {cpu.id}.")
-                cpu.current_job.next_burst(client_id, session_id, clock)
+    # Convert the running queue (list of CPU objects)
+    running_ids_list = [
+        f"CPU{cpu.id}:{cpu.current_job.pid}" if cpu.current_job else f"CPU{cpu.id}:Idle"
+        for cpu in running_queue
+    ]
+    running_ids = ", ".join(running_ids_list) if running_ids_list else "Empty"
 
-                if cpu.current_job.completed:
-                    cpu.current_job.update_state("TERMINATED")
-                    cpu.completed_jobs += 1
-                    terminatedQ.append(cpu.current_job)
-                    #print(f"Job {cpu.current_job.pid} has been terminated.")
-                elif cpu.current_job.is_cpu_burst():
-                    cpu.current_job.update_state("READY")
-                    readyQ.append(cpu.current_job)
-                    #print(f"Job {cpu.current_job.pid} added back to ready queue.")
-                else:
-                    cpu.current_job.update_state("WAITING")
-                    waitingQ.append(cpu.current_job)
-                    #print(f"Job {cpu.current_job.pid} moved to waiting queue for I/O.")
-                cpu.current_job = None  # Free up the CPU
-            elif cpu.current_job.remaining_time == 0:
-                # Time quantum expired, preempt the job
-                #print(f"Job {cpu.current_job.pid} preempted on CPU {cpu.id}.")
-                cpu.current_job.update_state("READY")
-                readyQ.append(cpu.current_job)  # Add back to the ready queue
-                cpu.current_job = None  # Free up the CPU
+    # Convert the I/O devices queue
+    io_ids_list = [
+        f"IO{io_device.id}:{io_device.current_job.pid}" if io_device.current_job else f"IO{io_device.id}:Idle"
+        for io_device in io_devices
+    ]
+    io_ids = ", ".join(io_ids_list) if io_ids_list else "Empty"
+
+    # Convert the waiting queue
+    waiting_ids_list = [str(proc.pid) for proc in waitingQ] if waitingQ else []
+    waiting_ids = ", ".join(waiting_ids_list) if waiting_ids_list else "Empty"
+
+    # Convert the terminated queue
+    terminated_ids_list = [str(proc.pid) for proc in terminatedQ] if terminatedQ else []
+    terminated_ids = ", ".join(terminated_ids_list) if terminated_ids_list else "Empty"
+
+    # Add rows to the table
+    table.add_row("READY (MLFQ)", ready_ids, style="magenta")
+    table.add_row("RUNNING", running_ids, style="green")
+    table.add_row("WAITING", waiting_ids, style="yellow")
+    table.add_row("IO DEVICES", io_ids, style="red3")
+    table.add_row("TERMINATED", terminated_ids, style="orange4")
+
+    # Print the table
+    console.print(table, justify="center")
+
+    # Shorter pause to improve responsiveness
+    time.sleep(0.5)
+
 
 
 def printAg(filename, algorithm_type, num_cpus,num_io, terminatedQ, running_queue, start_clock, end_time):
@@ -379,136 +347,242 @@ def printAg(filename, algorithm_type, num_cpus,num_io, terminatedQ, running_queu
     except Exception as e:
         print(f"Error writing to file {filename}: {e}")
 
-def print_queues(clock_tick, readyQ, running_queue, waitingQ, terminatedQ, algorithm_type):
+
+def handle_job_completion(process, ready_queues, terminated_queue, waiting_queue):
     """
-    Prints a table of processes in each queue at the current clock tick.
-
-    Args:
-        clock_tick (int): The current simulation clock tick.
-        ready_queue (list): The list of processes in the READY queue.
-        running_queue (list): The list of processes currently RUNNING.
-        io_queue (list): The list of processes in the IO queue.
-        terminated_queue (list): The list of terminated processes.
-    """
-    console = Console()
-
-    console.clear()
-
-    table = Table(title=f"{algorithm_type}: Process Queues at Clock Tick {clock_tick}")
+    Handle job completion and state transitions.
     
-    table.add_column("Queues", style="cyan", no_wrap=True)
-    table.add_column("Processes", style="cyan")
+    Args:
+        process (Process): The process to handle.
+        ready_queues (list): List of ready queues.
+        terminated_queue (deque): Queue for terminated jobs.
+        waiting_queue (deque): Queue for waiting jobs.
+    """
+    if process.completed:
+        process.update_state("TERMINATED")
+        terminated_queue.append(process)
+        print(f"Job {process.pid} has been terminated.")
+    elif process.is_cpu_burst():
+        process.update_state("READY")
+        process.priority = 0  # Reset to highest priority queue
+        ready_queues[0].append(process)
+    else:
+        process.update_state("WAITING")
+        waiting_queue.append(process)
+
+def mlfq_scheduling(
+    running_queue, 
+    ready_queues, 
+    waiting_queue, 
+    io_devices, 
+    terminated_queue, 
+    time_quanta, 
+    clock, 
+    client_id=None, 
+    session_id=None,
+    io_queue=None
+):
+    """
+    Multi-Level Feedback Queue Scheduling Algorithm with advanced job management.
+    
+    Args:
+        running_queue (list): List of CPU objects representing the CPUs.
+        ready_queues (list): List of ready queues for different priority levels.
+        waiting_queue (deque): Queue for jobs waiting for resources.
+        io_devices (list): List of I/O device objects.
+        terminated_queue (deque): Queue for completed jobs.
+        time_quanta (list): Time quantum for each priority level.
+        clock (int): Current simulation clock time.
+        client_id (str, optional): Client ID for API calls.
+        session_id (str, optional): Session ID for API calls.
+        io_queue (deque, optional): Queue for I/O waiting jobs.
+    """
+    
     
    
 
-    # Convert the running queue (list of CPU objects) to a string or "Empty" if no jobs
-    if running_queue:
-        running_ids_list = []
-        for cpu in running_queue:
-            if cpu.current_job:
-                running_ids_list.append(f"CPU{cpu.id}:{cpu.current_job.pid}")
-            else:
-                running_ids_list.append(f"CPU{cpu.id}:Idle")
-        running_ids = ", ".join(running_ids_list)
-    else:
-        running_ids = "Empty"
+    # Handle running jobs on CPUs
+    for cpu in running_queue:
+        if not cpu.current_job:
+            cpu.idle_time += 1
+            continue
+
+        # Process current job on CPU
+        cpu.current_job.remaining_time -= 1
+        cpu.active_time += 1
+
+        # Check if job burst is complete
+        if cpu.current_job.remaining_time <= 0:
+            #print(f"Job {cpu.current_job.pid} completed its burst on CPU {cpu.id}.")
+            
+            try:
+                burst_completed = cpu.current_job.proceed_burst(client_id, session_id, clock)
+                if burst_completed:
+                    handle_job_completion(
+                        cpu.current_job, 
+                        ready_queues, 
+                        terminated_queue, 
+                        waiting_queue
+                    )
+            except Exception as e:
+                print(f"Error processing job {cpu.current_job.pid}: {e}")
+            
+            cpu.current_job = None  # Free the CPU
+
+        # Check time quantum expiration
+        elif (cpu.current_job.remaining_time > 0 and 
+              (cpu.current_job.current_burst["duration"] - cpu.current_job.remaining_time) % time_quanta[cpu.current_job.priority] == 0):
+            print(f"Time quantum expired for Job {cpu.current_job.pid} on CPU {cpu.id}.")
+            
+            # Demote job priority
+            next_priority = min(len(ready_queues) - 1, cpu.current_job.priority + 1)
+            cpu.current_job.priority = next_priority
+            cpu.current_job.update_state("READY")
+            ready_queues[next_priority].append(cpu.current_job)
+            cpu.current_job = None  # Free the CPU
+
+    # Assign jobs from ready queues to idle CPUs
+    for priority, queue in enumerate(ready_queues):
+        while queue and any(cpu.current_job is None for cpu in running_queue):
+            try:
+                job = queue.popleft()
+                idle_cpu = next((cpu for cpu in running_queue if cpu.current_job is None), None)
+                
+                if idle_cpu:
+                    print(f"Assigning Job {job.pid} from priority {priority} queue to CPU {idle_cpu.id}.")
+                    idle_cpu.assign_job(job)
+                    job.remaining_time = min(time_quanta[priority], job.current_burst["duration"])
+                    job.update_state("RUNNING")
+            except Exception as e:
+                print(f"Error assigning job from priority {priority} queue: {e}")
+
+    # Process waiting queue
+    for process in list(waiting_queue):
+        process.current_burst["duration"] -= 1
+        
+        if process.current_burst["duration"] <= 0:
+            waiting_queue.remove(process)
+            
+            try:
+                burst_completed = process.next_burst(client_id, session_id, clock)
+                if burst_completed:
+                    handle_job_completion(
+                        process, 
+                        ready_queues, 
+                        terminated_queue, 
+                        waiting_queue
+                    )
+            except Exception as e:
+                print(f"Error processing waiting job {process.pid}: {e}")
+
+    # Handle I/O devices
+    for io_device in io_devices:
+        if not io_device.current_job:
+            io_device.idle_time += 1
+            continue
+
+        # Process current job on I/O device
+        io_device.current_job.current_burst["duration"] -= 1
+        io_device.active_time += 1
+
+        if io_device.current_job.current_burst["duration"] <= 0:
+            print(f"Job {io_device.current_job.pid} completed its I/O burst on IO{io_device.id}.")
+            
+            process = io_device.current_job
+            io_device.current_job = None  # Free the I/O device
+            io_device.completed_io_operations += 1
+
+            try:
+                burst_completed = process.next_burst(client_id, session_id, clock)
+                if burst_completed:
+                    handle_job_completion(
+                        process, 
+                        ready_queues, 
+                        terminated_queue, 
+                        waiting_queue
+                    )
+            except Exception as e:
+                print(f"Error processing I/O job {process.pid}: {e}")
+
+    # Assign jobs to idle I/O devices
+    for process in list(io_queue):
+        idle_io_device = next((io for io in io_devices if io.current_job is None), None)
+        if idle_io_device:
+            try:
+                io_queue.remove(process)
+                idle_io_device.assign_job(process)
+                print(f"Assigning Job {process.pid} to IO{idle_io_device.id}.")
+            except Exception as e:
+                print(f"Error assigning job to I/O device: {e}")
+
+            
 
 
-    # Convert other queues (readyQ, waitingQ, terminatedQ) to strings or "Empty" if no jobs
-    if readyQ:
-        ready_ids_list = []
-        for proc in readyQ:
-            ready_ids_list.append(str(proc.pid))
-        ready_ids = ", ".join(ready_ids_list)
-    else:
-        ready_ids = "Empty"
-
-    if waitingQ:
-        waiting_ids_list = []
-        for proc in waitingQ:
-            waiting_ids_list.append(str(proc.pid))
-        waiting_ids = ", ".join(waiting_ids_list)
-    else:
-        waiting_ids = "Empty"
-
-    if terminatedQ:
-        terminated_ids_list = []
-        for proc in terminatedQ:
-            terminated_ids_list.append(str(proc.pid))
-        terminated_ids = ", ".join(terminated_ids_list)
-    else:
-        terminated_ids = "Empty"
-
-    # Add rows to the table
-    table.add_row("READY", ready_ids, style="magenta")
-    table.add_row("RUNNING", running_ids, style = "green")
-    table.add_row("WAITING", waiting_ids, style = "yellow")
-    table.add_row("TERMINATED", terminated_ids, style = "orange4")
 
 
+if __name__== '__main__':
     
-    # Print the table
-    console.print(table, justify="center")
-
-    time.sleep(4)
-
-
-
-if __name__ == '__main__':
     ag_path = Path(__file__).resolve().parent.parent.parent / "aggregate"
-    ag_path.mkdir(parents=True, exist_ok=True)
 
+    # Initialize CPUs
     num_cpus = 4
     running_queue = [CPU(id=i) for i in range(num_cpus)]
-    
+
     #initialize io devices 
     num_io = 4
     io_queue = [IO(id = i) for i in range(num_io)]
 
-    readyQ, waitingQ, terminatedQ = deque(), deque(), deque()
+    # Initialize MLFQ-specific data structures
+    num_priority_levels = 3
+    ready_queues = [deque() for _ in range(num_priority_levels)]
+    terminated_queue = deque()
+    time_quanta = [4, 8, 16]  # Example time quanta for each priority level
+    waitingQ = deque()
+   
 
+    # type of scheduling algorithm to run 
+    algorithm_type = 'MLFQ'
+    #make sure to remove the temporary one if you are chaninge back to this 
+    # client_id = "BigSam"
 
-    algorithm_type = 'Round Robin'
     config = c.getConfig(0)
+    base_url = 'http://profgriffin.com:8000/'
     response = c.init(config)
-    client_id, session_id = config["client_id"], response["session_id"]
-    start_clock, clock = response['start_clock'], response['start_clock']
-    time_quantum = response.get("time_slice", 4)
+  
+    #temporary way of getting client id 
+    client_id = config["client_id"]
 
-    max_simulation_time = 10000
+    start_clock = response['start_clock']
+    session_id = response['session_id']
+    
+    clock = start_clock
+      
+    
 
+# Main loop
     while True:
         jobs_left = c.getJobsLeft(client_id, session_id)
-
-        if jobs_left == 0 and not readyQ and not any(cpu.current_job for cpu in running_queue):
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = ag_path / f"results_{timestamp}.txt"
-            printAg(filename, algorithm_type, num_cpus, num_io, terminatedQ, running_queue, start_clock, clock)
+        if jobs_left == 0 and not any(queue for queue in ready_queues) and not io_queue and not any(cpu.current_job for cpu in running_queue):
+            print("No jobs left. Simulation complete.")
             break
-
+        
+        # Fetch new jobs from the API and add to the highest-priority queue
         response = c.getJob(client_id, session_id, clock)
         if response and response["success"]:
             for data in response["data"]:
                 process = Process(
-                    data["arrival_time"], data["job_id"], data["priority"],
+                    data["arrival_time"],
+                    data["job_id"],
+                    data["priority"],
                     c.getBurstsLeft(client_id, session_id, data["job_id"])
                 )
                 process.next_burst(client_id, session_id, clock)
-                (readyQ if process.is_cpu_burst() else waitingQ).append(process)
+                ready_queues[0].append(process)
 
-        round_robin(running_queue, readyQ, time_quantum)
-
-        for process in list(waitingQ):
-            if process.proceed_burst(client_id, session_id, clock):
-                waitingQ.remove(process)
-                if process.completed:
-                    process.update_state("TERMINATED")
-                    terminatedQ.append(process)
-                elif process.is_cpu_burst():
-                    process.update_state("READY")
-                    readyQ.append(process)
+        # Run the MLFQ scheduler
+        mlfq_scheduling(running_queue, ready_queues, waitingQ,io_queue,terminated_queue,time_quanta,clock,client_id,session_id)
         
+        print_queues(clock,ready_queues, running_queue,waitingQ,io_queue,terminated_queue, algorithm_type)
         
-        print_queues(clock,readyQ,running_queue,waitingQ,terminatedQ, algorithm_type)
-        clock += 1
-        
+        # Increment clock
+        clock += 1 

@@ -1,0 +1,18 @@
+Scheduling Algorithm: FCFS
+Number of CPUs: 4
+Number of IODs: 4
+Total Simulation Time: 101
+Throughput: 0.05 jobs/unit time
+CPU Utilization: 16.34%
+Mean Wait Time: 2.60
+Mean Turnaround Time: 15.80
+Fairness (Turnaround Time Std Dev): 9.37
+
+Terminated Jobs:
+PID       Arrival   Priority  Wait Time Burst Time     Turnaround Time     
+================================================================================
+1         3576      2         -1        6              5                   
+2         3593      2         -1        24             23                  
+3         3610      3         -1        14             13                  
+4         3623      2         -1        9              8                   
+5         3634      1         17        13             30                  

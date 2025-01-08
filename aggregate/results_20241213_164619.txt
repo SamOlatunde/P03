@@ -1,0 +1,23 @@
+Scheduling Algorithm: P
+Number of CPUs: 4
+Number of IODs: 4
+Total Simulation Time: 167
+Throughput: 0.06 jobs/unit time
+CPU Utilization: 30.39%
+Mean Wait Time: 22.90
+Mean Turnaround Time: 24.90
+Fairness (Turnaround Time Std Dev): 11.34
+
+Terminated Jobs:
+PID       Arrival   Priority  Wait Time Burst TimeTurnaround Time     
+==================================================
+2         9945      1         11        2         13                  
+1         9925      3         48        1         49                  
+4         9970      3         13        2         15                  
+3         9959      2         30        3         33                  
+6         9994      2         12        1         13                  
+5         9984      1         29        1         30                  
+8         10029     3         12        1         13                  
+7         10011     2         29        3         32                  
+9         10042     2         27        3         30                  
+10        10054     2         18        3         21                  
